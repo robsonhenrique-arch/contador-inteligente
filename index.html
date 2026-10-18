@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contador Inteligente de Pessoas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #101827;
+      color: white;
+      text-align: center;
+      padding: 16px;
+    }
+    video {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 14px;
+      background: black;
+    }
+    button {
+      padding: 14px 20px;
+      margin: 8px;
+      border: 0;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #status { color: #70e1c1; }
+  </style>
+</head>
+<body>
+  <h1>Contador Inteligente</h1>
+  <p id="status">Aguardando início da câmera</p>
+
+  <video id="camera" autoplay playsinline muted></video>
+
+  <p>Teste inicial da câmera do sistema.</p>
+  <button id="iniciar">Abrir câmera</button>
+
+  <script>
+    const camera = document.getElementById("camera");
+    const status = document.getElementById("status");
+
+    document.getElementById("iniciar").onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+
+        camera.srcObject = stream;
+        status.textContent =
+          "Câmera ligada! Teste realizado com sucesso.";
+      } catch (erro) {
+        status.textContent =
+          "Não foi possível abrir a câmera. Verifique a permissão.";
+      }
+    };
+  </script>
+</body>
+</html>
