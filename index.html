@@ -5,59 +5,141 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Contador Inteligente de Pessoas</title>
+  <script type="module">
+    import {
+      FaceDetector,
+      FilesetResolver
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+    window.iniciarDeteccao = async function () {
+      const video = document.getElementById("camera");
+      const canvas = document.getElementById("marcacoes");
+      const ctx = canvas.getContext("2d");
+      const status = document.getElementById("status");
+      const botao = document.getElementById("iniciar");
+
+      botao.disabled = true;
+      status.textContent = "Carregando detector de rostos...";
+
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+        );
+
+        const detector = await FaceDetector.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
+          },
+          runningMode: "VIDEO",
+          minDetectionConfidence: 0.6
+        });
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        status.textContent = "Detector ativo. Posicione um rosto diante da câmera.";
+
+        let ultimoVideo = -1;
+
+        function analisar() {
+          if (video.readyState >= 2 && video.currentTime !== ultimoVideo) {
+            ultimoVideo = video.currentTime;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const resultado = detector.detectForVideo(video, performance.now());
+            const rostos = resultado.detections || [];
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#00e5a8";
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#00e5a8";
+
+            for (const rosto of rostos) {
+              const b = rosto.boundingBox;
+              ctx.strokeRect(b.originX, b.originY, b.width, b.height);
+              ctx.fillText("Rosto", b.originX, Math.max(18, b.originY - 6));
+            }
+
+            status.textContent = "Rostos detectados: " + rostos.length;
+          }
+
+          requestAnimationFrame(analisar);
+        }
+
+        analisar();
+      } catch (erro) {
+        console.error(erro);
+        status.textContent =
+          "Erro ao iniciar. Verifique a internet e tente novamente.";
+        botao.disabled = false;
+      }
+    };
+  </script>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
       background: #101827;
       color: white;
+      font-family: Arial, sans-serif;
       text-align: center;
-      padding: 16px;
+    }
+    .quadro {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      margin: auto;
     }
     video {
       width: 100%;
-      max-width: 500px;
-      border-radius: 14px;
+      display: block;
+      border-radius: 12px;
       background: black;
+    }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
     button {
       padding: 14px 20px;
-      margin: 8px;
       border: 0;
       border-radius: 10px;
       font-size: 16px;
-      cursor: pointer;
+      margin-top: 12px;
     }
-    #status { color: #70e1c1; }
+    #status {
+      color: #70e1c1;
+      min-height: 24px;
+    }
   </style>
 </head>
 <body>
   <h1>Contador Inteligente</h1>
-  <p id="status">Aguardando início da câmera</p>
+  <p id="status">Pronto para iniciar</p>
 
-  <video id="camera" autoplay playsinline muted></video>
+  <div class="quadro">
+    <video id="camera" autoplay playsinline muted></video>
+    <canvas id="marcacoes"></canvas>
+  </div>
 
-  <p>Teste inicial da câmera do sistema.</p>
-  <button id="iniciar">Abrir câmera</button>
-
-  <script>
-    const camera = document.getElementById("camera");
-    const status = document.getElementById("status");
-
-    document.getElementById("iniciar").onclick = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false
-        });
-
-        camera.srcObject = stream;
-        status.textContent =
-          "Câmera ligada! Teste realizado com sucesso.";
-      } catch (erro) {
-        status.textContent =
-          "Não foi possível abrir a câmera. Verifique a permissão.";
-      }
-    };
-  </script>
+  <button id="iniciar" onclick="iniciarDeteccao()">
+    Iniciar detecção
+  </button>
+  <p>Teste de detecção local de rostos.</p>
 </body>
 </html>
