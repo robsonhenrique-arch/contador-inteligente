@@ -1,85 +1,88 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ponte USB — micro:bit</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #101827;
-      color: white;
-      text-align: center;
-      padding: 24px;
-    }
-    button {
-      display: block;
-      width: 100%;
-      max-width: 340px;
-      margin: 14px auto;
-      padding: 16px;
-      border: 0;
-      border-radius: 10px;
-      font-size: 17px;
-    }
-    #status { color: #70e1c1; }
-  </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contador Inteligente de Pessoas</title>
+<script type="module">
+import {FaceDetector, FilesetResolver} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+window.iniciarDeteccao = async () => {
+ const video=document.getElementById("camera"), canvas=document.getElementById("marcacoes"), ctx=canvas.getContext("2d");
+ const status=document.getElementById("status"), botao=document.getElementById("iniciar");
+ botao.disabled=true; status.textContent="Carregando detector...";
+ try {
+  const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const detector=await FaceDetector.createFromOptions(vision,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"},runningMode:"VIDEO",minDetectionConfidence:0.6});
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:640},height:{ideal:480}},audio:false});
+  video.srcObject=stream; await video.play(); canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  window.detectorAtivo=true; status.textContent="Câmera ativa. Aguardando rosto...";
+  let ultimo=-1;
+  function analisar(){
+   if(video.readyState>=2 && video.currentTime!==ultimo){
+    ultimo=video.currentTime; ctx.clearRect(0,0,canvas.width,canvas.height);
+    const rostos=detector.detectForVideo(video,performance.now()).detections||[];
+    ctx.lineWidth=3;ctx.strokeStyle="#00e5a8";ctx.fillStyle="#00e5a8";ctx.font="16px Arial";
+    for(const r of rostos){const b=r.boundingBox;ctx.strokeRect(b.originX,b.originY,b.width,b.height);ctx.fillText("Rosto",b.originX,Math.max(18,b.originY-6));}
+    window.atualizarDeteccao(rostos.length);
+   } requestAnimationFrame(analisar);
+  } analisar();
+ } catch(e){console.error(e);status.textContent="Erro ao iniciar. Verifique internet e permissão da câmera.";botao.disabled=false;}
+};
+</script>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:18px;background:#101827;color:#fff;font-family:Arial,sans-serif;text-align:center}
+h1{font-size:1.65rem}.quadro{position:relative;width:100%;max-width:500px;margin:auto}video{width:100%;display:block;border-radius:12px;background:#000}
+canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}button{font:inherit;border:0;border-radius:10px;padding:13px 15px;cursor:pointer;font-weight:bold}
+button:disabled{opacity:.45}#iniciar{background:#00e5a8;color:#06251e;margin:12px auto;width:100%;max-width:500px}
+#status{color:#70e1c1;min-height:24px}.painel{max-width:500px;margin:16px auto;background:#1b293c;padding:16px;border-radius:14px}
+.turmas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.turma{background:#31435b;color:white;min-height:52px}.turma.selecionada{background:#00e5a8;color:#06251e}
+.linha{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.secundario{background:#31435b;color:white}.destaque{color:#00e5a8;font-size:1.7rem;font-weight:bold}
+.muted,.aviso{color:#cbd5e1;font-size:.85rem;line-height:1.45}.tabela-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:10px}
+th,td{padding:9px 6px;border-bottom:1px solid #3b4a60;text-align:left}th{color:#70e1c1}
+</style>
 </head>
 <body>
-  <h1>Conexão micro:bit</h1>
-  <p id="status">Conecte o micro:bit ao Chromebook pelo USB.</p>
-
-  <button id="conectar">1. Conectar micro:bit</button>
-  <button id="testar" disabled>2. Testar uma entrada</button>
-
-  <script>
-    let porta = null;
-    let gravador = null;
-
-    const status = document.getElementById("status");
-    const conectar = document.getElementById("conectar");
-    const testar = document.getElementById("testar");
-
-    conectar.onclick = async () => {
-      try {
-        if (!("serial" in navigator)) {
-          status.textContent =
-            "Este navegador não oferece Web Serial. Use o Chrome no Chromebook.";
-          return;
-        }
-
-        status.textContent = "Selecione o micro:bit na janela que abrir.";
-
-        porta = await navigator.serial.requestPort();
-        await porta.open({ baudRate: 115200 });
-
-        gravador = porta.writable.getWriter();
-
-        status.textContent = "micro:bit conectado!";
-        conectar.disabled = true;
-        testar.disabled = false;
-      } catch (erro) {
-        console.error(erro);
-        status.textContent =
-          "Não conectou. Confira o cabo USB e tente novamente.";
-      }
-    };
-
-    testar.onclick = async () => {
-      if (!gravador) return;
-
-      try {
-        await gravador.write(
-          new TextEncoder().encode("ENTRADA\n")
-        );
-        status.textContent =
-          "Comando enviado! Confira o LCD e a matriz de LEDs.";
-      } catch (erro) {
-        console.error(erro);
-        status.textContent = "Falha ao enviar o comando.";
-      }
-    };
-  </script>
-</body>
-</html>
+<h1>Contador Inteligente</h1><p id="status">Pronto para iniciar</p>
+<div class="quadro"><video id="camera" autoplay playsinline muted></video><canvas id="marcacoes"></canvas></div>
+<button id="iniciar" onclick="iniciarDeteccao()">Iniciar câmera e detecção</button>
+<section class="painel"><h2>Registrar turma</h2><p id="instrucao">Quando um rosto aparecer, selecione a turma correspondente.</p>
+<div class="turmas"><button class="turma" data-turma="7º A">7º A</button><button class="turma" data-turma="7º B">7º B</button><button class="turma" data-turma="7º C">7º C</button></div>
+<p class="muted">Após registrar, aguarde o rosto sair do enquadramento para habilitar o próximo registro.</p></section>
+<section class="painel"><h2>Resumo</h2><p>Total de registros</p><div class="destaque" id="total">0</div><div class="linha" id="resumoTurmas"></div>
+<div class="linha" style="margin-top:14px"><button class="secundario" id="exportar">Exportar relatório CSV</button><button class="secundario" id="limpar">Limpar registros</button></div></section>
+<section class="painel"><h2>Histórico</h2><div class="tabela-wrap"><table><thead><tr><th>Data</th><th>Horário</th><th>Turma</th></tr></thead><tbody id="historico"><tr><td colspan="3">Nenhum registro ainda.</td></tr></tbody></table></div></section>
+<p class="aviso">Privacidade: o site não salva fotografias nem identifica alunos. Os registros ficam apenas neste navegador. A detecção de rosto não garante uma contagem única por pessoa; confira o relatório antes de usá-lo oficialmente.</p>
+<script>
+const statusEl=document.getElementById("status"), instrucao=document.getElementById("instrucao"), botoes=[...document.querySelectorAll(".turma")], chave="contadorInteligenteRegistrosV1";
+let registros=[];try{registros=JSON.parse(localStorage.getItem(chave)||"[]");if(!Array.isArray(registros))registros=[]}catch{registros=[]}
+let rostoPresente=false, pronto=true, temporizador=null;
+function salvar(){try{localStorage.setItem(chave,JSON.stringify(registros))}catch{alert("Não foi possível salvar os dados. Exporte o relatório.")}renderizar()}
+window.atualizarDeteccao=qtd=>{
+ rostoPresente=qtd>0;
+ if(rostoPresente){statusEl.textContent="Rosto detectado. Selecione a turma.";if(pronto)instrucao.textContent="Selecione a turma da pessoa detectada."}
+ else{statusEl.textContent="Nenhum rosto detectado. Aguardando...";if(!temporizador)temporizador=setTimeout(()=>{pronto=true;temporizador=null;botoes.forEach(b=>b.disabled=false);botoes.forEach(b=>b.classList.remove("selecionada"));instrucao.textContent="Pronto para o próximo registro."},1800)}
+};
+botoes.forEach(botao=>botao.addEventListener("click",()=>{
+ if(!window.detectorAtivo){instrucao.textContent="Inicie a câmera antes de registrar.";return}
+ if(!rostoPresente){instrucao.textContent="Aguarde um rosto aparecer na câmera.";return}
+ if(!pronto){instrucao.textContent="Aguarde o rosto sair do enquadramento antes de registrar novamente.";return}
+ const d=new Date();registros.push({data:d.toLocaleDateString("pt-BR"),horario:d.toLocaleTimeString("pt-BR"),turma:botao.dataset.turma,timestamp:d.getTime()});
+ pronto=false;botoes.forEach(b=>{b.disabled=true;b.classList.toggle("selecionada",b===botao)});
+ instrucao.textContent="Registrado: "+botao.dataset.turma+". Aguarde a pessoa sair do enquadramento.";salvar();
+}));
+function renderizar(){
+ document.getElementById("total").textContent=registros.length;const resumo=document.getElementById("resumoTurmas");resumo.replaceChildren();
+ ["7º A","7º B","7º C"].forEach(t=>{const s=document.createElement("span");s.className="muted";s.style.padding="8px";s.textContent=t+": "+registros.filter(r=>r.turma===t).length;resumo.appendChild(s)});
+ const tbody=document.getElementById("historico");tbody.replaceChildren();
+ if(!registros.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=3;td.textContent="Nenhum registro ainda.";tr.appendChild(td);tbody.appendChild(tr);return}
+ [...registros].reverse().slice(0,100).forEach(r=>{const tr=document.createElement("tr");[r.data,r.horario,r.turma].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)});tbody.appendChild(tr)});
+}
+document.getElementById("exportar").onclick=()=>{
+ if(!registros.length){alert("Ainda não há registros para exportar.");return}
+ const linhas=[["Data","Horário","Turma"],...registros.map(r=>[r.data,r.horario,r.turma])];
+ const csv="\uFEFF"+linhas.map(l=>l.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+ const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"})),a=document.createElement("a");a.href=url;a.download="relatorio-contador-turmas.csv";a.click();URL.revokeObjectURL(url);
+};
+document.getElementById("limpar").onclick=()=>{if(confirm("Apagar todos os registros deste navegador? Exporte uma cópia antes, se necessário.")){registros=[];salvar()}};
+renderizar();
+</script>
+</body></html>
